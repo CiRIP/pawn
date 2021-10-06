@@ -296,15 +296,16 @@ enum EFI_GRAPHICS_OUTPUT_BLT_OPERATION, \
 	EfiBltVideoToVideo, \
 	EfiGraphicsOutputBltOperationMax
 
-struc EFI_GRAPHICS_OUTPUT_BLT_PIXEL a, b, c, d {
-	.Blue			db	a
-	.Green			db	b
-	.Red			db	c
-	.Reserved		db	d
-}
-virtual at 0
-	EFI_GRAPHICS_OUTPUT_BLT_PIXEL EFI_GRAPHICS_OUTPUT_BLT_PIXEL ?, ?, ?, ?
-end virtual
+
+include 'struct.inc'
+
+struct EFI_GRAPHICS_OUTPUT_BLT_PIXEL
+	Blue			db	?
+	Green			db	?
+	Red			db	?
+	Reserved		db	?
+ends
+
 
 
 ; ------------------------------ macros ------------------------------
@@ -451,6 +452,113 @@ macro u_call interface, function, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
 	end if
 	
 	call	uefifunc
+}
+
+macro e_call function, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11 {
+	push	rbx
+	push	rbp
+	push	rdi
+	push	rsi
+	push	r12
+	push	r13
+	push	r14
+	push	r15
+	numarg = 0
+
+	if ~ arg11 eq
+		numarg = numarg + 1
+		if ~ arg11 eq rdi
+			mov	rdi, arg11
+		end if
+	end if
+
+	if ~ arg10 eq
+		numarg = numarg + 1
+		if ~ arg10 eq rsi
+			mov	rsi, arg10
+		end if
+	end if
+
+	if ~ arg9 eq
+		numarg = numarg + 1
+		if ~ arg9 eq r14
+			mov	r14, arg9
+		end if
+	end if
+
+	if ~ arg8 eq
+		numarg = numarg + 1
+		if ~ arg8 eq r13
+			mov	r13, arg8
+		end if
+	end if
+
+	if ~ arg7 eq
+		numarg = numarg + 1
+		if ~ arg7 eq r12
+			mov	r12, arg7
+		end if
+	end if
+
+	if ~ arg6 eq
+		numarg = numarg + 1
+		if ~ arg6 eq r11
+			mov	r11, arg6
+		end if
+	end if
+
+	if ~ arg5 eq
+		numarg = numarg + 1
+		if ~ arg5 eq r10
+			mov	r10, arg5
+		end if
+	end if
+
+	if ~ arg4 eq
+		numarg = numarg + 1
+		if ~ arg4 eq r9
+			mov	r9, arg4
+		end if
+	end if
+
+	if ~ arg3 eq
+		numarg = numarg + 1
+		if ~ arg3 eq r8
+			mov	r8, arg3
+		end if
+	end if
+
+	if ~ arg2 eq
+		numarg = numarg + 1
+		if ~ arg2 eq rdx
+			mov	rdx, arg2
+		end if
+	end if
+
+	if ~ arg1 eq
+		numarg = numarg + 1
+		if ~ arg1 eq rcx
+			mov	rcx, arg1
+		end if
+	end if
+
+	xor	eax, eax
+	mov	al, numarg
+
+	if ~ function eq rbx
+		mov	rbx, function
+	end if
+	
+	call	uefifunc
+
+	pop	r15
+	pop	r14
+	pop	r13
+	pop	r12
+	pop	rsi
+	pop	rdi
+	pop	rbp
+	pop	rbx
 }
  
 ;*********************************************************************

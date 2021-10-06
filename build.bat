@@ -1,5 +1,8 @@
 @echo off
 
+@echo Building sprites...
+for %%x in (.\src\assets\*.png) do magick stream -map bgra -storage-type char %%x .\src\assets\%%~nx.bgra
+
 @echo Assembling...
 fasm .\src\main.asm .\build\EFI\Boot\BOOTX64.EFI
 
