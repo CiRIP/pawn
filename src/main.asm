@@ -7,6 +7,8 @@ include 'uefi.inc'
 
 include 'game.inc'
 
+include 'graphics.inc'
+
 ; RCX, RDX, R8, R9
 
 main:
@@ -18,45 +20,58 @@ main:
 	u_call	ConOut, EnableCursor, ConOut, 0
 	u_call	ConOut, OutputString, ConOut, _hello
 
-	u_call	BootServices, LocateProtocol, gopGuid, 0, gop
+	;u_call	BootServices, LocateProtocol, gopGuid, 0, gop
+	u_lp	gopGuid, gop
+	u_call	BootServices, LocateProtocol, sppGuid, 0, spp
+
+	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], 0
+
+	mov	rax, qword [gop]
+	mov	rax, qword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL.Mode]
+	mov	ecx, dword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE.MaxMode]
+	dec	ecx
+
+	loop_modes:
+		push	rcx
+		u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.QueryMode, [gop], 0, tmp, gopInfo
+		pop	rcx
+
+		mov	eax, dword [gopInfo + EFI_GRAPHICS_OUTPUT_MODE_INFORMATION.PixelFormat]
+		cmp	eax, 1
+		jle	@f
+
+		dec	rcx
+		jns	loop_modes
+@@:	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], rcx
 
 	; u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.QueryMode, [gop], 0, tmp, gopInfo
-	; u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], 10
 
-	; u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], pixel, EfiBltVideoFill, 0, 0, 0, 0, 200, 200, 0
+	u_call	[spp], EFI_SIMPLE_POINTER_PROTOCOL.Reset, [spp], 0
+
+	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], background, EfiBltVideoFill, 0, 0, 0, 0, 200, 200, 0
+
+	mov	rcx, boardBltBuffer
+	call	init_board
 
 
-	mov	rdx, 8
-	boardRow:
-		mov	rcx, 8
-		boardCol:
-			mov	rax, rcx
-			add	rax, rdx
-			imul	r9, rcx, 32
-			sub	r9, 32
-			imul	r8, rdx, 32
-			sub	r8, 32
-
-			and	rax, 1
-			jz	light
-		dark:	mov	rax, tileDark
-			jmp	@f
-		light:	mov	rax, tileLight
-		@@:
-
+	mov	rdx, 7
+	pieceRow:
+		mov	rcx, 7
+		pieceCol:
 			push	rcx
 			push	rdx
-			e_call	blit, boardBltBuffer, 256, 256, r9, r8, rax, 32, 32
+			call	render_piece
 			pop	rdx
 			pop	rcx
-			
-			dec	rcx
-			jnz	boardCol
+
+		@@:	dec	rcx
+			jns	pieceCol
 		
 		dec	rdx
-		jnz	boardRow
+		jns	pieceRow
+			
 	
-	e_call	blit, boardBltBuffer, 256, 256, 0, 0, checkerRed, 32, 32
+	; e_call	blit, boardBltBuffer, 256, 256, 0, 0, [SPRITES + PIECE.Checker + COLOR.Red], 32, 32
 
 
 
@@ -100,46 +115,6 @@ main:
 	ret
 
 
-blit:
-	push	rbp
-	mov	rbp, rsp
-
-	mov	rdi, rcx		; 1st arg (destination)		rcx
-	imul	r10, rdx, 4		; 2nd arg (destination width)	rdx
-					; 3rd arg (destination height)	r8
-	imul	r9, 4			; 4th arg (destination X)	r9
-	add	rdi, r9
-	
-	mov	r11, [rbp + 48]		; 5th arg (destination Y)
-	imul	r11, r10
-	add	rdi, r11
-
-	mov	rsi, [rbp + 56]		; 6th arg (source)
-	mov	r12, [rbp + 64]		; 7th arg (source width)
-	imul	r14, r12, 4
-	sub	r10, r14		; skip
-	mov	r13, [rbp + 72]		; 8th arg (source height)
-
-	mov	rdx, r13
-	row:
-		mov	rcx, r12
-		col:
-			mov	eax, dword [rsi]
-			test	al, al
-			jz	@f
-			mov	dword [rdi], eax
-		@@:	add	rdi, 4
-			add	rsi, 4
-			loop	col
-		add	rdi, r10
-		dec	rdx
-		test	rdx, rdx
-		jnz	row
-
-	mov	rsp, rbp
-	pop	rbp
-	ret
-
 
 section '.data' data readable writeable
 _hello				du	'Hello World!', 13, 10, \
@@ -151,18 +126,13 @@ gop				dq	0
 gopInfo				dq	0
 tmp				dq	0
 
+sppGuid				db	EFI_SIMPLE_POINTER_PROTOCOL_GUID
+spp				dq	0
+
 background			EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xEE, 0xEE, 0xEE, 0x00
 frame				EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xA1, 0xC9, 0xE4, 0x00
 
 boardBltBuffer	times 65536	EFI_GRAPHICS_OUTPUT_BLT_PIXEL	?
-
-smile				file	'./assets/smile.bgra'
-tileDark			file	'./assets/tile_dark.bgra'
-tileLight			file	'./assets/tile_light.bgra'
-
-checkerRed			file	'./assets/checker_red.bgra'
-
-
 
 
 section '.reloc' fixups data discardable

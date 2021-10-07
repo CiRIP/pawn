@@ -255,9 +255,27 @@ struc EFI_BLOCK_IO_MEDIA {
 	.IoAlign		int32
 	.LastBlock		int64
 }
-struct EFI_BLOCK_IO_MEDIA 
+struct EFI_BLOCK_IO_MEDIA
 
-EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID equ 0deh, 0a9h, 42h, 90h, 0dch, 023h, 38h, 04ah, 96h, 0fbh, 7ah, 0deh, 0d0h, 80h, 51h, 6ah
+EFI_SIMPLE_POINTER_PROTOCOL_GUID equ 0x87, 0x8c, 0x87, 0x31, 0x75, 0x0b, 0xd5, 0x11, 0x9a, 0x4f, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d
+struc EFI_SIMPLE_POINTER_PROTOCOL {
+	.Reset			dptr
+	.GetState		dptr
+	.WaitForInput		dptr
+	.Mode			dptr
+}
+struct EFI_SIMPLE_POINTER_PROTOCOL
+
+struc EFI_SIMPLE_POINTER_MODE {
+	.ResolutionX		int64
+	.ResolutionY		int64
+	.ResolutionZ		int64
+	.LeftButton		int8
+	.RightButton		int8
+}
+struct EFI_SIMPLE_POINTER_MODE
+
+EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID equ 0xde, 0xa9, 0x42, 0x90, 0xdc, 0x23, 0x38, 0x4a, 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 struc EFI_GRAPHICS_OUTPUT_PROTOCOL {
 	.QueryMode		dptr
 	.SetMode		dptr
@@ -324,6 +342,28 @@ macro u_init {
 	@@:
 		mov	[ImageHandle], rcx		; ImageHandle
 		mov	[SystemTable], rdx    		; pointer to SystemTable
+}
+
+macro u_lp guid, interface {
+	mov	qword [tmpHandleNum], 400
+	u_call	BootServices, LocateHandle, 2, guid, 0, tmpHandleNum, tmpHandle
+	test	rax, rax
+	jz	@f
+		u_call	ConOut, OutputString, ConOut, _error_LocateHandle
+		lkp: jmp lkp
+@@:	xor	ecx, ecx
+	loop_handles:
+		push	rcx
+		imul	rax, rcx, 8
+		add	rax, tmpHandle
+		u_call	BootServices, HandleProtocol, [rax], guid, interface
+		pop	rcx
+		test	rax, rax
+		jz	@f
+		inc	rcx
+		cmp	rcx, [tmpHandleNum]
+		jl	loop_handles
+@@:	
 }
  
 ; invoke an UEFI function
@@ -606,3 +646,13 @@ section '.data' data readable writeable
 ImageHandle:	dq	0
 SystemTable:	dq	0
 uefi_rsptmp:	dq	0
+
+tmpHandle:	rq	50
+tmpHandleNum:	dq	400
+
+
+
+
+
+
+_error_LocateHandle:	du	'Error in LocateHandle', 13, 10, 0
