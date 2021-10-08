@@ -30,6 +30,7 @@ COLOR.Red = 0
 COLOR.Black = 8
 
 section '.data' data readable writeable
+align 16
 
 smile				file	'./assets/smile.bgra'
 tileDark			file	'./assets/tile_dark.bgra'

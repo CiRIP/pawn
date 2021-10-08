@@ -636,7 +636,11 @@ uefifunc:
 @@:	cmp	al, 5
 	jb	@f
 	push	r10
-@@:	sub	rsp, 4 * 8			; space for r9 r8 rdx rcx
+@@:	;sub	rsp, 4 * 8			; space for r9 r8 rdx rcx
+	push	r9
+	push	r8
+	push	rdx
+	push	rcx
 	call	rbx				; call function
 	mov	rsp, qword [uefi_rsptmp]	; restore old stack
 	ret

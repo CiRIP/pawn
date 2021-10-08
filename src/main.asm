@@ -1,7 +1,7 @@
-format pe64 dll efi
+format pe64 efi at 0 on 'NUL'
 entry main
 
-section '.text' code executable readable
+section '.text' code executable readable writeable
 
 include 'uefi.inc'
 
@@ -11,20 +11,29 @@ include 'graphics.inc'
 
 ; RCX, RDX, R8, R9
 
+; align 64
+; background			EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xEE, 0xEE, 0xEE, 0x00
+align 64
 main:
-	u_init
+	mov rax,rsp
+	enter 1024,0
+	; u_init
+	mov	[ImageHandle], rcx		; ImageHandle
+	mov	[SystemTable], rdx    		; pointer to SystemTable
 
 
 	u_call	BootServices, SetWatchdogTimer, 0, 0, 0, 0
-	u_call	ConOut, Reset, ConOut
+	;u_call	ConOut, ClearScreen, ConOut
 	u_call	ConOut, EnableCursor, ConOut, 0
 	u_call	ConOut, OutputString, ConOut, _hello
+
+	;ha: jmp ha
 
 	;u_call	BootServices, LocateProtocol, gopGuid, 0, gop
 	u_lp	gopGuid, gop
 	u_call	BootServices, LocateProtocol, sppGuid, 0, spp
 
-	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], 0
+	;u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], 0
 
 	mov	rax, qword [gop]
 	mov	rax, qword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL.Mode]
@@ -42,7 +51,7 @@ main:
 
 		dec	rcx
 		jns	loop_modes
-@@:	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], rcx
+@@:	;u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], rcx
 
 	; u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.QueryMode, [gop], 0, tmp, gopInfo
 
@@ -117,6 +126,8 @@ main:
 
 
 section '.data' data readable writeable
+
+align 64
 _hello				du	'Hello World!', 13, 10, \
 					0
 _dbg				du	'.', 0
@@ -129,8 +140,16 @@ tmp				dq	0
 sppGuid				db	EFI_SIMPLE_POINTER_PROTOCOL_GUID
 spp				dq	0
 
-background			EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xEE, 0xEE, 0xEE, 0x00
+align 4				; apparently bltBuffers and pixels need to be aligned on 4 bytes
+				; QEMU has no problems with them unaligned, but real UEFI implementations
+				; shit themselves.
+				; if this had been properly documented in the spec, I wouldn't have wasted
+				; a whole fucking day debugging this stupid shit.
+				; hopefully this will serve as a pointer to future lone coders trying to
+				; develop for UEFI in ASM. I'm sorry for the hours you've wasted till you
+				; found this :(
 frame				EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xA1, 0xC9, 0xE4, 0x00
+background			EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xEE, 0xEE, 0xEE, 0x00
 
 boardBltBuffer	times 65536	EFI_GRAPHICS_OUTPUT_BLT_PIXEL	?
 
