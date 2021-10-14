@@ -55,7 +55,7 @@ main:
 
 	; u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.QueryMode, [gop], 0, tmp, gopInfo
 
-	u_call	[spp], EFI_SIMPLE_POINTER_PROTOCOL.Reset, [spp], 0
+	; u_call	[spp], EFI_SIMPLE_POINTER_PROTOCOL.Reset, [spp], 0
 
 	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], background, EfiBltVideoFill, 0, 0, 0, 0, 200, 200, 0
 
@@ -82,46 +82,85 @@ main:
 	
 	; e_call	blit, boardBltBuffer, 256, 256, 0, 0, [SPRITES + PIECE.Checker + COLOR.Red], 32, 32
 
-
-
-	mov	rax, qword [gop]
-	mov	rax, qword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL.Mode]
-	mov	rax, qword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE.ModeInfo]
-	mov	ecx, dword [rax + EFI_GRAPHICS_OUTPUT_MODE_INFORMATION.HorizontalResolution]
-	mov	edx, dword [rax + EFI_GRAPHICS_OUTPUT_MODE_INFORMATION.VerticalResolution]
-
-	push	rcx
-	push	rdx
-
-	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], background, EfiBltVideoFill, 0, 0, 0, 0, rcx, rdx
+	call	render_screen
 	
-	mov	rdx, [rsp]
-	sub	rdx, 288
-	shr	rdx, 1
-	mov	rcx, [rsp + 8]
-	sub	rcx, 288
-	shr	rcx, 1
 
-	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], frame, EfiBltVideoFill, 0, 0, rcx, rdx, 288, 288, 0
-	
-	mov	rdx, [rsp]
-	sub	rdx, 256
-	shr	rdx, 1
-	mov	rcx, [rsp + 8]
-	sub	rcx, 256
-	shr	rcx, 1
+setup_events:
+	u_call	ConIn, Reset, ConIn
+	mov	rax, qword [SystemTable]
+	mov	rax, qword [rax + EFI_SYSTEM_TABLE.ConIn]
+	mov	rax, qword [rax + SIMPLE_INPUT_INTERFACE.WaitForKey]
+	mov	[events], rax
 
-	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], boardBltBuffer, EfiBltBufferToVideo, 0, 0, rcx, rdx, 256, 256, 0
+	u_call	[spp], EFI_SIMPLE_POINTER_PROTOCOL.Reset, [spp], 0
+	mov	rax, qword [spp]
+	mov	rdx, qword [rax + EFI_SIMPLE_POINTER_PROTOCOL.Mode]
+	mov	rax, qword [rax + EFI_SIMPLE_POINTER_PROTOCOL.WaitForInput]
+	mov	[events + 8], rax
 	
-	; e_call	blit
+	mov	rcx, qword [rdx + EFI_SIMPLE_POINTER_MODE.ResolutionX]
+	mov	[resolutionX], rcx
 
-	@@:
-		jmp	@b
-	
-	exit:
-	
-	mov	eax, EFI_SUCCESS
+	mov	rcx, qword [rdx + EFI_SIMPLE_POINTER_MODE.ResolutionY]
+	mov	[resolutionY], rcx
+
+
+event_loop:
+	mov	[index], 0
+	u_call	BootServices, WaitForEvent, 2, events, index
+	mov	rcx, [index]
+	call	qword [event_table + rcx * 8]
+
+	jmp	event_loop
+
+
+
+
+key_event:
+	u_call	ConIn, ReadKeyStroke, ConIn, key
+	mov	dx, word [key + EFI_INPUT_KEY.UnicodeChar]
+	mov	word [op], dx
+
+	u_call	ConOut, OutputString, ConOut, op
 	ret
+
+
+
+pointer_event:
+	u_call	[spp], EFI_SIMPLE_POINTER_PROTOCOL.GetState, [spp], state
+
+	mov	eax, dword [state + EFI_SIMPLE_POINTER_STATE.RelativeMovementX]
+
+	cdq
+	mov	ecx, dword [resolutionX]
+	idiv	ecx
+	xor	r8, r8
+	mov	r8d, dword [mouseX]
+	add	dword [mouseX], eax
+
+	mov	eax, dword [state + EFI_SIMPLE_POINTER_STATE.RelativeMovementY]
+
+	cdq
+	mov	ecx, dword [resolutionY]
+	idiv	ecx
+	xor	r9, r9
+	mov	r9d, dword [mouseY]
+	add	dword [mouseY], eax
+
+
+	call	render_screen
+	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], cursor, EfiBltBufferToVideo, 0, 0, [mouseX], [mouseY], 32, 32, 0
+
+
+	mov	dl, byte [state + EFI_SIMPLE_POINTER_STATE.LeftButton]
+	test	dl, dl
+	jz	@f
+	
+	u_call	ConOut, OutputString, ConOut, op
+
+@@:	ret
+
+
 
 
 
@@ -133,12 +172,26 @@ _hello				du	'Hello World!', 13, 10, \
 _dbg				du	'.', 0
 
 gopGuid				db	EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID
-gop				dq	0
-gopInfo				dq	0
-tmp				dq	0
+gop				rq	1
+gopInfo				rq	1
+tmp				rq	1
 
 sppGuid				db	EFI_SIMPLE_POINTER_PROTOCOL_GUID
-spp				dq	0
+spp				rq	1
+
+events				rq	2
+event_table:
+				dq	key_event
+				dq	pointer_event
+index				rq	1
+key				EFI_INPUT_KEY
+op				du	'.', 0
+state				EFI_SIMPLE_POINTER_STATE
+
+resolutionX			rq	1
+resolutionY			rq	1
+mouseX				dq	100
+mouseY				dq	100
 
 align 4				; apparently bltBuffers and pixels need to be aligned on 4 bytes
 				; QEMU has no problems with them unaligned, but real UEFI implementations
@@ -148,10 +201,9 @@ align 4				; apparently bltBuffers and pixels need to be aligned on 4 bytes
 				; hopefully this will serve as a pointer to future lone coders trying to
 				; develop for UEFI in ASM. I'm sorry for the hours you've wasted till you
 				; found this :(
-frame				EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xA1, 0xC9, 0xE4, 0x00
-background			EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0xEE, 0xEE, 0xEE, 0x00
+black				EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0x00, 0x00, 0x00, 0x00
+cursor				file	'./assets/cursor.bgra'
 
-boardBltBuffer	times 65536	EFI_GRAPHICS_OUTPUT_BLT_PIXEL	?
 
 
 section '.reloc' fixups data discardable

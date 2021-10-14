@@ -39,12 +39,15 @@ tileLight			file	'./assets/tile_light.bgra'
 checkerRed			file	'./assets/checker_red.bgra'
 checkerBlack			file	'./assets/checker_black.bgra'
 
+bishopWhite			file	'./assets/bishop_white.bgra'
+bishopBlack			file	'./assets/bishop_black.bgra'
+
 
 SPRITES:
 	dq	checkerRed
 	dq	checkerBlack
-	dq	checkerRed
-	dq	checkerBlack
+	dq	bishopWhite
+	dq	bishopBlack
 
 board:
 	db	4 dup (-1, PIECE.Checker + COLOR.Red)

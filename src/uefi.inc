@@ -136,6 +136,12 @@ struc SIMPLE_INPUT_INTERFACE {
 }
 struct SIMPLE_INPUT_INTERFACE
 
+struc EFI_INPUT_KEY {
+	.ScanCode		int16
+	.UnicodeChar		int16
+}
+struct EFI_INPUT_KEY
+
 struc EFI_BOOT_SERVICES_TABLE {
 	.Hdr					EFI_TABLE_HEADER
 	.RaisePriority				dptr
@@ -274,6 +280,15 @@ struc EFI_SIMPLE_POINTER_MODE {
 	.RightButton		int8
 }
 struct EFI_SIMPLE_POINTER_MODE
+
+struc EFI_SIMPLE_POINTER_STATE {
+	.RelativeMovementX	int32
+	.RelativeMovementY	int32
+	.RelativeMovementZ	int32
+	.LeftButton		int8
+	.RightButton		int8
+}
+struct EFI_SIMPLE_POINTER_STATE
 
 EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID equ 0xde, 0xa9, 0x42, 0x90, 0xdc, 0x23, 0x38, 0x4a, 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 struc EFI_GRAPHICS_OUTPUT_PROTOCOL {
