@@ -329,6 +329,60 @@ enum EFI_GRAPHICS_OUTPUT_BLT_OPERATION, \
 	EfiBltVideoToVideo, \
 	EfiGraphicsOutputBltOperationMax
 
+TPL_APPLICATION				= 4
+TPL_CALLBACK				= 8
+TPL_NOTIFY				= 16
+TPL_HIGH_LEVEL				= 3
+
+EVT_TIMER				= 0x80000000
+EVT_RUNTIME				= 0x40000000
+EVT_NOTIFY_WAIT				= 0x00000100
+EVT_NOTIFY_SIGNAL			= 0x00000200
+EVT_SIGNAL_EXIT_BOOT_SERVICES		= 0x00000201
+EVT_SIGNAL_VIRTUAL_ADDRESS_CHANGE	= 0x60000202
+
+EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL	= 0x00000001
+EFI_OPEN_PROTOCOL_GET_PROTOCOL		= 0x00000002
+EFI_OPEN_PROTOCOL_TEST_PROTOCOL		= 0x00000004
+EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER	= 0x00000008
+EFI_OPEN_PROTOCOL_BY_DRIVER		= 0x00000010
+EFI_OPEN_PROTOCOL_EXCLUSIVE		= 0x00000020
+
+
+EFI_TCP4_SERVICE_BINDING_PROTOCOL_GUID equ 0x65, 0x06, 0x72, 0x00, 0xEB, 0x67, 0x99, 0x4A, 0xBA, 0xF7, 0xD3, 0xC3, 0x3A, 0x1C, 0x7C, 0xC9
+struc EFI_SERVICE_BINDING_PROTOCOL {
+	.CreateChild		dptr
+	.DestroyChild		dptr
+}
+struct EFI_SERVICE_BINDING_PROTOCOL
+
+
+EFI_TCP4_PROTOCOL_GUID equ 0xC7, 0x0B, 0x53, 0x65, 0x59, 0xA3, 0x0F, 0x41, 0xB0, 0x10, 0x5A, 0xAD, 0xC7, 0xEC, 0x2B, 0x62
+struc EFI_TCP4_PROTOCOL {
+	.GetModeData		dptr
+	.Configure		dptr
+	.Routes			dptr
+	.Connect		dptr
+	.Accept			dptr
+	.Transmit		dptr
+	.Receive		dptr
+	.Close			dptr
+	.Cancel			dptr
+	.Poll			dptr
+}
+struct EFI_TCP4_PROTOCOL
+
+
+EFI_HII_IMAGE_PROTOCOL_GUID equ 0x6A, 0x40, 0xA6, 0x31, 0xDF, 0x6B, 0x46, 0x4E, 0xB2, 0xA2, 0xEB, 0xAA, 0x89, 0xC4, 0x9, 0x20
+struc EFI_HII_IMAGE_PROTOCOL {
+	.NewImage		dptr
+	.GetImage		dptr
+	.SetImage		dptr
+	.DrawImage		dptr
+	.DrawImageId		dptr
+}
+struct EFI_HII_IMAGE_PROTOCOL
+
 
 include 'struct.inc'
 
@@ -337,6 +391,66 @@ struct EFI_GRAPHICS_OUTPUT_BLT_PIXEL
 	Green			db	?
 	Red			db	?
 	Reserved		db	?
+ends
+
+
+struct EFI_IMAGE_INPUT
+	Flags			int32
+	Width			int16
+	Height			int16
+	Bitmap			dptr
+ends
+
+struct EFI_IMAGE_OUTPUT
+	Width			int16
+	Height			int16
+	Reserved		int32
+	Image			dptr
+ends
+
+
+struct EFI_TCP4_COMPLETION_TOKEN
+	Event			dq	?
+	Status			dq	?
+ends
+
+struct EFI_TCP4_CONNECTION_TOKEN
+	CompletionToken		EFI_TCP4_COMPLETION_TOKEN	?
+ends
+
+struct EFI_TCP4_LISTEN_TOKEN
+	CompletionToken		EFI_TCP4_COMPLETION_TOKEN	?
+	NewChildHandle		dq	?
+ends
+
+struct EFI_TCP4_IO_TOKEN
+	CompletionToken		EFI_TCP4_COMPLETION_TOKEN	?
+	Packet			dq	?
+ends
+
+struct EFI_TCP4_RECEIVE_DATA
+	UrgentFlag		int8
+	DataLength		int32
+	FragmentCount		int32
+	FragmentTable		dptr
+ends
+
+struct EFI_TCP4_TRANSMIT_DATA
+	Push			int8
+	Urgent			int8
+	DataLength		int32
+	FragmentCount		int32
+	FragmentTable		dptr
+ends
+
+struct EFI_TCP4_FRAGMENT_DATA
+	FragmentLength		int32
+	FragmentBuffer		dptr
+ends
+
+struct EFI_TCP4_CLOSE_TOKEN
+	CompletionToken		EFI_TCP4_COMPLETION_TOKEN
+	AbortOnClose		int8
 ends
 
 

@@ -4,10 +4,11 @@ entry main
 section '.text' code executable readable writeable
 
 include 'uefi.inc'
-
 include 'game.inc'
-
 include 'graphics.inc'
+include 'utils.inc'
+include 'events.inc'
+include 'network.inc'
 
 ; RCX, RDX, R8, R9
 
@@ -23,15 +24,29 @@ main:
 
 
 	u_call	BootServices, SetWatchdogTimer, 0, 0, 0, 0
+	debug
+	jmp_err	exit
 	;u_call	ConOut, ClearScreen, ConOut
 	u_call	ConOut, EnableCursor, ConOut, 0
+	debug
 	u_call	ConOut, OutputString, ConOut, _hello
+	debug
+	jmp_err exit
 
 	;ha: jmp ha
 
 	;u_call	BootServices, LocateProtocol, gopGuid, 0, gop
 	u_lp	gopGuid, gop
+	debug
+	jmp_err exit
+
 	u_call	BootServices, LocateProtocol, sppGuid, 0, spp
+	debug
+	jmp_err exit
+
+	u_call	BootServices, LocateProtocol, hipGuid, 0, hip
+	debug
+	jmp_err exit
 
 	;u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.SetMode, [gop], 0
 
@@ -59,17 +74,31 @@ main:
 
 	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], background, EfiBltVideoFill, 0, 0, 0, 0, 200, 200, 0
 
-	mov	rcx, boardBltBuffer
-	call	init_board
+	mov	rax, qword [gop]
+	mov	qword [screen + EFI_IMAGE_OUTPUT.Image], rax
+	mov	rax, qword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL.Mode]
+	mov	rdx, qword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE.FrameBufferBase]
+	mov	qword [screen + EFI_IMAGE_OUTPUT.Image], rdx
+	mov	rax, qword [rax + EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE.ModeInfo]
+	mov	ecx, dword [rax + EFI_GRAPHICS_OUTPUT_MODE_INFORMATION.HorizontalResolution]
+	mov	edx, dword [rax + EFI_GRAPHICS_OUTPUT_MODE_INFORMATION.VerticalResolution]
 
+	mov	word [screen + EFI_IMAGE_OUTPUT.Width], cx
+	mov	word [screen + EFI_IMAGE_OUTPUT.Height], dx
+
+	mov	qword [screenWidth], rcx
+	mov	qword [screenHeight], rdx
 
 	mov	rdx, 7
 	pieceRow:
 		mov	rcx, 7
 		pieceCol:
+			mov	r8, tileLightImage
+			mov	r9, tileDarkImage
+
 			push	rcx
 			push	rdx
-			call	render_piece
+			call	render_tile
 			pop	rdx
 			pop	rcx
 
@@ -83,6 +112,10 @@ main:
 	; e_call	blit, boardBltBuffer, 256, 256, 0, 0, [SPRITES + PIECE.Checker + COLOR.Red], 32, 32
 
 	call	render_screen
+
+	mov	rcx, 7
+	mov	rdx, 7
+	call	select_tile
 	
 
 setup_events:
@@ -104,7 +137,6 @@ setup_events:
 	mov	rcx, qword [rdx + EFI_SIMPLE_POINTER_MODE.ResolutionY]
 	mov	[resolutionY], rcx
 
-
 event_loop:
 	mov	[index], 0
 	u_call	BootServices, WaitForEvent, 2, events, index
@@ -113,54 +145,7 @@ event_loop:
 
 	jmp	event_loop
 
-
-
-
-key_event:
-	u_call	ConIn, ReadKeyStroke, ConIn, key
-	mov	dx, word [key + EFI_INPUT_KEY.UnicodeChar]
-	mov	word [op], dx
-
-	u_call	ConOut, OutputString, ConOut, op
-	ret
-
-
-
-pointer_event:
-	u_call	[spp], EFI_SIMPLE_POINTER_PROTOCOL.GetState, [spp], state
-
-	mov	eax, dword [state + EFI_SIMPLE_POINTER_STATE.RelativeMovementX]
-
-	cdq
-	mov	ecx, dword [resolutionX]
-	idiv	ecx
-	xor	r8, r8
-	mov	r8d, dword [mouseX]
-	add	dword [mouseX], eax
-
-	mov	eax, dword [state + EFI_SIMPLE_POINTER_STATE.RelativeMovementY]
-
-	cdq
-	mov	ecx, dword [resolutionY]
-	idiv	ecx
-	xor	r9, r9
-	mov	r9d, dword [mouseY]
-	add	dword [mouseY], eax
-
-
-	call	render_screen
-	u_call	[gop], EFI_GRAPHICS_OUTPUT_PROTOCOL.Blt, [gop], cursor, EfiBltBufferToVideo, 0, 0, [mouseX], [mouseY], 32, 32, 0
-
-
-	mov	dl, byte [state + EFI_SIMPLE_POINTER_STATE.LeftButton]
-	test	dl, dl
-	jz	@f
-	
-	u_call	ConOut, OutputString, ConOut, op
-
-@@:	ret
-
-
+exit:	ret
 
 
 
@@ -170,28 +155,37 @@ align 64
 _hello				du	'Hello World!', 13, 10, \
 					0
 _dbg				du	'.', 0
+_dbg_wdt			du	'SetWatchdogTimer', 0
 
+align 8
 gopGuid				db	EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID
 gop				rq	1
 gopInfo				rq	1
 tmp				rq	1
 
+screen				EFI_IMAGE_OUTPUT
+
+align 8
 sppGuid				db	EFI_SIMPLE_POINTER_PROTOCOL_GUID
 spp				rq	1
+
+align 8
+hipGuid				db	EFI_HII_IMAGE_PROTOCOL_GUID
+hip				rq	1
 
 events				rq	2
 event_table:
 				dq	key_event
 				dq	pointer_event
 index				rq	1
-key				EFI_INPUT_KEY
-op				du	'.', 0
-state				EFI_SIMPLE_POINTER_STATE
+
 
 resolutionX			rq	1
 resolutionY			rq	1
 mouseX				dq	100
 mouseY				dq	100
+screenWidth			rq	1
+screenHeight			rq	1
 
 align 4				; apparently bltBuffers and pixels need to be aligned on 4 bytes
 				; QEMU has no problems with them unaligned, but real UEFI implementations
@@ -202,7 +196,12 @@ align 4				; apparently bltBuffers and pixels need to be aligned on 4 bytes
 				; develop for UEFI in ASM. I'm sorry for the hours you've wasted till you
 				; found this :(
 black				EFI_GRAPHICS_OUTPUT_BLT_PIXEL	0x00, 0x00, 0x00, 0x00
+
+align 8
 cursor				file	'./assets/cursor.bgra'
+align 8
+hipBlt				dq	screen
+cursorImage			EFI_IMAGE_INPUT			0x01, 32, 32, cursor
 
 
 
